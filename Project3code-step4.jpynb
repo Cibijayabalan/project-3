@@ -1,0 +1,81 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, classification_report
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+
+# Assuming your features are in X and your target variable (placement outcome) is in y
+# X = df.drop(columns=['placement_outcome'])
+# y = df['placement_outcome']
+
+# 1. Train-Test Split (with stratification to preserve class balance)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# 2. Define Baseline Models
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
+    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    "Random Forest": RandomForestClassifier(random_state=42),
+    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+}
+
+# 3. Cross-Validation & Baseline Evaluation
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+results = []
+for name, model in models.items():
+    fold_accuracies = []
+    fold_f1 = []
+    
+    # Simple manual CV loop or use cross_validate
+    for train_idx, val_idx in cv.split(X_train, y_train):
+        X_fold_train, X_fold_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+        y_fold_train, y_fold_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+        
+        model.fit(X_fold_train, y_fold_train)
+        preds = model.predict(X_fold_val)
+        
+        fold_accuracies.append(accuracy_score(y_fold_val, preds))
+        fold_f1.append(f1_score(y_fold_val, preds, average='weighted'))
+        
+    results.append({
+        "Model": name,
+        "CV Accuracy": np.mean(fold_accuracies),
+        "CV F1-Score": np.mean(fold_f1)
+    })
+
+results_df = pd.DataFrame(results)
+print("--- Baseline Cross-Validation Results ---")
+print(results_df)
+
+# 4. Hyperparameter Tuning for the Best Model (e.g., Random Forest or XGBoost)
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [None, 5, 10],
+    'min_samples_split': [2, 5, 10]
+}
+
+grid_search = GridSearchCV(
+    estimator=RandomForestClassifier(random_state=42),
+    param_grid=param_grid,
+    cv=cv,
+    scoring='f1_weighted',
+    n_jobs=-1
+)
+
+grid_search.fit(X_train, y_train)
+
+print("\n--- Best Parameters Found ---")
+print(grid_search.best_params_)
+
+# 5. Final Evaluation on Test Set
+best_model = grid_search.best_estimator_
+test_preds = best_model.predict(X_test)
+
+print("\n--- Final Test Performance ---")
+print(classification_report(y_test, test_preds))

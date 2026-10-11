@@ -1,0 +1,56 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import (
+    classification_report, 
+    confusion_matrix, 
+    roc_auc_score, 
+    roc_curve, 
+    precision_recall_curve
+)
+
+# Assuming 'pipeline' is your trained model pipeline and X_test, y_test are ready
+# y_test mapping: 1 = Job Accepted (Placed), 0 = Job Rejected (Not Placed)
+
+# 1. Predictions and Probabilities
+y_pred = pipeline.predict(X_test)
+y_prob = pipeline.predict_proba(X_test)[:, 1] # Probability of Class 1 (Job Accepted)
+
+# 2. Classification Metrics Report
+print("--- Classification Report ---")
+print(classification_report(y_test, y_pred, target_names=['Job Rejected (0)', 'Job Accepted (1)']))
+
+# 3. ROC-AUC Score
+roc_auc = roc_auc_score(y_test, y_prob)
+print(f"ROC-AUC Score: {roc_auc:.4f}")
+
+# 4. Visualizing Confusion Matrix
+plt.figure(figsize=(6, 5))
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+            xticklabels=['Job Rejected', 'Job Accepted'],
+            yticklabels=['Job Rejected', 'Job Accepted'])
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted Label')
+plt.ylabel('Actual Label')
+plt.tight_layout()
+plt.show()
+
+# 5. Plotting ROC Curve
+fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+plt.figure(figsize=(6, 5))
+plt.plot(fpr, tpr, color='blue', label=f'ROC Curve (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend(loc='lower right')
+plt.tight_layout()
+plt.show()
+
+# 6. Optional: Finding an Optimal Threshold using Precision-Recall
+precision, recall, thrs = precision_recall_curve(y_test, y_prob)
+# Find threshold that balances or optimizes a specific business metric (e.g., F1-score)
+f1_scores = 2 * (precision * recall) / (precision + recall + 1e-10)
+best_threshold = thrs[np.argmax(f1_scores)]
+print(f"Optimal Probability Threshold for Best F1-Score: {best_threshold:.4f}")

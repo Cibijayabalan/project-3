@@ -1,0 +1,11 @@
+from sqlalchemy import create_engine
+import pandas as pd
+
+# Create connection engine (replace credentials accordingly)
+engine = create_engine('mysql+pymysql://username:password@localhost:3306/your_database_name')
+
+# Query data back into DataFrame for visualization or reporting
+query = "SELECT * FROM processed_placements WHERE placement_outcome = 'Placed'"
+df_placed = pd.read_sql(query, con=engine)
+
+print(df_placed.head())

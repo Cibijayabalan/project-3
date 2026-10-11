@@ -1,0 +1,97 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.metrics import classification_report, f1_score
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+
+# Assuming 'df' is your DataFrame containing both raw and engineered columns
+# df = pd.read_csv('your_placement_dataset.csv')
+
+# 1. Feature Engineering Step (Example transformations)
+def engineer_features(data):
+    df_eng = data.copy()
+    
+    # Experience category
+    df_eng['experience_category'] = pd.cut(
+        df_eng['years_of_experience'], 
+        bins=[-1, 0, 2, 10], 
+        labels=['Fresher', 'Junior', 'Senior']
+    )
+    
+    # Academic performance bands
+    df_eng['academic_band'] = pd.qcut(
+        df_eng['cgpa_or_percentage'], 
+        q=3, 
+        labels=['Low', 'Medium', 'High']
+    )
+    
+    # Skills match level
+    df_eng['skills_match_level'] = pd.cut(
+        df_eng['skills_match_percentage'], 
+        bins=[-1, 50, 75, 100], 
+        labels=['Low', 'Medium', 'High']
+    )
+    
+    return df_eng
+
+df_processed = engineer_features(df)
+
+# Define feature subset (including your newly engineered columns)
+features_to_use = [
+    'experience_category', 
+    'academic_band', 
+    'skills_match_level', 
+    'interview_score', 
+    'company_tier',
+    'placement_probability_score'
+]
+
+X = df_processed[features_to_use]
+y = df_processed['placement_outcome']
+
+# 2. Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# 3. Preprocessing Pipeline for Categorical Engineered Features
+# Automatically identify categorical columns for one-hot encoding
+categorical_cols = ['experience_category', 'academic_band', 'skills_match_level']
+numerical_cols = [col for col in features_to_use if col not in categorical_cols]
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_cols)
+    ],
+    remainder='passthrough' # Keeps numerical columns as-is
+)
+
+# 4. Create an End-to-End Pipeline with a Tree-Based Model (Random Forest)
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
+])
+
+# 5. Train and Evaluate using Cross-Validation
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+cv_f1_scores = []
+
+for train_idx, val_idx in cv.split(X_train, y_train):
+    X_fold_train, X_fold_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+    y_fold_train, y_fold_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+    
+    pipeline.fit(X_fold_train, y_fold_train)
+    preds = pipeline.predict(X_fold_val)
+    cv_f1_scores.append(f1_score(y_fold_val, preds, average='weighted'))
+
+print(f"--- Cross-Validation F1-Score (With Engineered Features): {np.mean(cv_f1_scores):.4f} ---")
+
+# 6. Final Train & Test Evaluation
+pipeline.fit(X_train, y_train)
+final_preds = pipeline.predict(X_test)
+
+print("\n--- Final Test Classification Report ---")
+print(classification_report(y_test, final_preds))

@@ -1,0 +1,108 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Assuming 'df' is your cleaned dataset containing all required variables
+# df = pd.read_csv('cleaned_placement_dataset.csv')
+
+# Set visual style
+sns.set_theme(style="whitegrid")
+fig, axes = plt.subplots(3, 2, figsize=(16, 18))
+
+# ==========================================
+# 1. CANDIDATE PERFORMANCE ANALYSIS
+# ==========================================
+
+# A. Academic Scores vs Placement Outcome
+sns.boxplot(
+    ax=axes[0, 0], 
+    x='placement_outcome', 
+    y='cgpa_or_percentage', 
+    data=df, 
+    palette='Set2'
+)
+axes[0, 0].set_title('Academic Performance vs Placement Outcome')
+axes[0, 0].set_xlabel('Placement Outcome (0 = Rejected, 1 = Accepted)')
+axes[0, 0].set_ylabel('Academic Score (CGPA / %)')
+
+# B. Skills Match vs Interview Performance
+sns.scatterplot(
+    ax=axes[0, 1],
+    x='skills_match_percentage',
+    y='interview_score',
+    hue='placement_outcome',
+    data=df,
+    alpha=0.7,
+    palette='coolwarm'
+)
+axes[0, 1].set_title('Skills Match vs. Interview Score')
+axes[0, 1].set_xlabel('Skills Match Percentage')
+axes[0, 1].set_ylabel('Interview Score')
+
+# ==========================================
+# 2. PLACEMENT & ACCEPTANCE ANALYSIS
+# ==========================================
+
+# C. Acceptance Rate by Company Tier
+tier_acceptance = df.groupby('company_tier')['placement_outcome'].mean().reset_index()
+sns.barplot(
+    ax=axes[1, 0],
+    x='company_tier',
+    y='placement_outcome',
+    data=tier_acceptance,
+    palette='Blues_d'
+)
+axes[1, 0].set_title('Job Acceptance Rate by Company Tier')
+axes[1, 0].set_xlabel('Company Tier')
+axes[1, 0].set_ylabel('Acceptance Rate')
+
+# D. Experience vs Placement Success
+exp_success = df.groupby('experience_category')['placement_outcome'].mean().reset_index()
+sns.barplot(
+    ax=axes[1, 1],
+    x='experience_category',
+    y='placement_outcome',
+    data=exp_success,
+    palette='viridis'
+)
+axes[1, 1].set_title('Placement Success Rate by Experience Category')
+axes[1, 1].set_xlabel('Experience Category')
+axes[1, 1].set_ylabel('Placement Rate')
+
+# ==========================================
+# 3. INTERVIEW & EVALUATION ANALYSIS
+# ==========================================
+
+# E. Interview Score vs Placement Probability
+if 'placement_probability_score' in df.columns:
+    sns.regplot(
+        ax=axes[2, 0],
+        x='interview_score',
+        y='placement_probability_score',
+        data=df,
+        scatter_kws={'alpha':0.3},
+        line_kws={'color':'red'}
+    )
+    axes[2, 0].set_title('Interview Score vs. Model Placement Probability')
+    axes[2, 0].set_xlabel('Interview Score')
+    axes[2, 0].set_ylabel('Placement Probability Score')
+else:
+    axes[2, 0].text(0.5, 0.5, 'Probability Score Column Missing', ha='center')
+
+# F. Employability Test Score Distribution by Outcome
+sns.kdeplot(
+    ax=axes[2, 1],
+    data=df,
+    x='employability_test_score',
+    hue='placement_outcome',
+    fill=True,
+    common_norm=False,
+    palette='husl'
+)
+axes[2, 1].set_title('Employability Test Score Distribution')
+axes[2, 1].set_xlabel('Employability Test Score')
+axes[2, 1].set_ylabel('Density')
+
+plt.tight_layout()
+plt.show()

@@ -1,0 +1,112 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+# 1. Page Configuration
+st.set_page_config(
+    page_title="Placement & Recruitment Analytics Dashboard",
+    page_icon="📊",
+    layout="wide"
+)
+
+# 2. Mock Data Generation (Replace with df = pd.read_sql(...) or pd.read_csv(...))
+@st.cache_data
+def load_data():
+    np.random.seed(42)
+    n = 1000
+    data = pd.DataFrame({
+        'candidate_id': range(1, n + 1),
+        'experience_category': np.random.choice(['Fresher', 'Junior', 'Senior'], n, p=[0.5, 0.3, 0.2]),
+        'company_tier': np.random.choice(['Tier 1', 'Tier 2', 'Tier 3'], n, p=[0.2, 0.5, 0.3]),
+        'placement_outcome': np.random.choice([0, 1], n, p=[0.35, 0.65]), # 1 = Placed, 0 = Not Placed
+        'job_accepted': np.random.choice([0, 1], n, p=[0.2, 0.8]), # Among placed/offered
+        'dropout': np.random.choice([0, 1], n, p=[0.85, 0.15]), # Offer dropout status
+        'high_risk': np.random.choice([0, 1], n, p=[0.8, 0.2]), # High churn/rejection risk flag
+        'interview_score': np.random.randint(40, 100, n),
+        'skills_match_percentage': np.random.uniform(40.0, 99.0, n)
+    })
+    return data
+
+df = load_data()
+
+# 3. Sidebar Filters
+st.sidebar.header("Dashboard Filters")
+selected_tier = st.sidebar.multiselect(
+    "Select Company Tier:",
+    options=df['company_tier'].unique(),
+    default=df['company_tier'].unique()
+)
+
+selected_exp = st.sidebar.multiselect(
+    "Select Experience Category:",
+    options=df['experience_category'].unique(),
+    default=df['experience_category'].unique()
+)
+
+# Filter DataFrame
+filtered_df = df[
+    (df['company_tier'].isin(selected_tier)) & 
+    (df['experience_category'].isin(selected_exp))
+]
+
+# 4. Dashboard Title
+st.title("📊 Placement & Recruitment Analytics Dashboard")
+st.markdown("Monitor core recruitment performance metrics, candidate success, and risk factors in real-time.")
+
+# 5. Key Performance Indicators (KPIs) Calculation
+total_candidates = len(filtered_df)
+placement_rate = (filtered_df['placement_outcome'].sum() / total_candidates) * 100 if total_candidates > 0 else 0
+acceptance_rate = (filtered_df['job_accepted'].sum() / total_candidates) * 100 if total_candidates > 0 else 0
+avg_interview_score = filtered_df['interview_score'].mean() if total_candidates > 0 else 0
+avg_skills_match = filtered_df['skills_match_percentage'].mean() if total_candidates > 0 else 0
+dropout_rate = (filtered_df['dropout'].sum() / total_candidates) * 100 if total_candidates > 0 else 0
+high_risk_pct = (filtered_df['high_risk'].sum() / total_candidates) * 100 if total_candidates > 0 else 0
+
+# 6. Display KPIs in Metrics Rows (Streamlit columns)
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Candidates", f"{total_candidates:,}")
+col2.metric("Placement Rate", f"{placement_rate:.1f}%")
+col3.metric("Job Acceptance Rate", f"{acceptance_rate:.1f}%")
+col4.metric("Offer Dropout Rate", f"{dropout_rate:.1f}%")
+
+col5, col6, col7 = st.columns(3)
+col5.metric("Avg Interview Score", f"{avg_interview_score:.1f} / 100")
+col6.metric("Avg Skills Match %", f"{avg_skills_match:.1f}%")
+col7.metric("High-Risk Candidate %", f"{high_risk_pct:.1f}%")
+
+st.markdown("---")
+
+# 7. Visualizations Row
+chart_col1, chart_col2 = st.columns(2)
+
+with chart_col1:
+    st.subheader("Placement Rate by Company Tier")
+    tier_summary = filtered_df.groupby('company_tier')['placement_outcome'].mean().reset_index()
+    tier_summary['placement_outcome'] *= 100
+    fig_tier = px.bar(
+        tier_summary, 
+        x='company_tier', 
+        y='placement_outcome',
+        labels={'placement_outcome': 'Placement Rate (%)', 'company_tier': 'Company Tier'},
+        color='company_tier',
+        text_auto='.1f'
+    )
+    st.plotly_chart(fig_tier, use_container_width=True)
+
+with chart_col2:
+    st.subheader("Interview Score vs. Skills Match")
+    fig_scatter = px.scatter(
+        filtered_df,
+        x='skills_match_percentage',
+        y='interview_score',
+        color='placement_outcome',
+        labels={'skills_match_percentage': 'Skills Match (%)', 'interview_score': 'Interview Score'},
+        color_continuous_scale='Bluered',
+        opacity=0.7
+    )
+    st.plotly_chart(fig_scatter, use_container_width=True)
+
+# 8. Data Table View
+st.subheader("Filtered Candidate Record Explorer")
+st.dataframe(filtered_df.head(100), use_container_width=True)
